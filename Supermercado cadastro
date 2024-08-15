@@ -1,0 +1,98 @@
+import tkinter as tk
+from tkinter import messagebox, ttk
+import sqlite3 
+
+conn = sqlite3.connect('supermercado.db')
+c = conn.cursor() 
+
+c.execute('''
+    CREATE TABLE IF NOT EXISTS produtos (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        codigo TEXT,
+        preco_compra REAL,
+        preco_venda REAL,
+        quantidade INTEGER,
+        descricao TEXT
+    )
+''')
+conn.commit() 
+
+def adicionar_produto():
+    nome = entry_nome.get()
+    codigo = entry_codigo.get()
+    preco_compra = float(entry_preco_compra.get())
+    preco_venda = float(entry_preco_venda.get())
+    quantidade = int(entry_quantidade.get())
+    descricao = entry_descricao.get()
+ 
+    c.execute('''
+        INSERT INTO produtos (nome, codigo, preco_compra, preco_venda, quantidade, descricao)
+        VALUES (?, ?, ?, ?, ?, ?)
+    ''', (nome, codigo, preco_compra, preco_venda, quantidade, descricao))
+    conn.commit()
+    
+    messagebox.showinfo("Sucesso", "Produto adicionado com sucesso!")
+    limpar_campos()
+    atualizar_lista_produtos() 
+
+def limpar_campos():
+    entry_nome.delete(0, tk.END)
+    entry_codigo.delete(0, tk.END)
+    entry_preco_compra.delete(0, tk.END)
+    entry_preco_venda.delete(0, tk.END)
+    entry_quantidade.delete(0, tk.END)
+    entry_descricao.delete(0, tk.END) 
+
+def atualizar_lista_produtos():
+    for row in tree.get_children():
+        tree.delete(row)
+    
+    c.execute('SELECT * FROM produtos')
+    for row in c.fetchall():
+        tree.insert('', tk.END, values=row) 
+
+root = tk.Tk()
+root.title("Sistema de Gestão de Supermercado") 
+
+tk.Label(root, text="Nome").grid(row=0, column=0)
+entry_nome = tk.Entry(root)
+entry_nome.grid(row=0, column=1)
+ 
+tk.Label(root, text="Código").grid(row=1, column=0)
+entry_codigo = tk.Entry(root)
+entry_codigo.grid(row=1, column=1)
+ 
+tk.Label(root, text="Preço de Compra").grid(row=2, column=0)
+entry_preco_compra = tk.Entry(root)
+entry_preco_compra.grid(row=2, column=1)
+ 
+tk.Label(root, text="Preço de Venda").grid(row=3, column=0)
+entry_preco_venda = tk.Entry(root)
+entry_preco_venda.grid(row=3, column=1)
+ 
+tk.Label(root, text="Quantidade").grid(row=4, column=0)
+entry_quantidade = tk.Entry(root)
+entry_quantidade.grid(row=4, column=1)
+ 
+tk.Label(root, text="Descrição").grid(row=5, column=0)
+entry_descricao = tk.Entry(root)
+entry_descricao.grid(row=5, column=1) 
+
+tk.Button(root, text="Adicionar Produto", command=adicionar_produto).grid(row=6, columnspan=2, pady=10) 
+
+columns = ('ID', 'Nome', 'Código', 'Preço Compra', 'Preço Venda', 'Quantidade', 'Descrição')
+tree = ttk.Treeview(root, columns=columns, show='headings')
+tree.grid(row=7, column=0, columnspan=2, pady=10)
+ 
+for col in columns:
+    tree.heading(col, text=col)
+    tree.column(col, width=120) 
+
+atualizar_lista_produtos()
+ 
+root.mainloop() 
+
+conn.close()
+
+
