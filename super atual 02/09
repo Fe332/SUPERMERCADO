@@ -1,0 +1,200 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+from tkcalendar import DateEntry
+import json
+import os
+from datetime import datetime, timedelta
+
+# Função para carregar dados de um arquivo JSON
+def carregar_dados(arquivo):
+    if os.path.exists(arquivo):
+        with open(arquivo, 'r') as f:
+            return json.load(f)
+    return []
+
+# Função para salvar dados em um arquivo JSON
+def salvar_dados(arquivo, dados):
+    with open(arquivo, 'w') as f:
+        json.dump(dados, f, indent=4)
+
+# Função genérica para adicionar registros
+def adicionar_registro(aba, tree, campos, dados_arquivo):
+    registro = {campo: entrada.get() for campo, entrada in campos.items()}
+    dados = carregar_dados(dados_arquivo)
+    dados.append(registro)
+    salvar_dados(dados_arquivo, dados)
+    tree.insert('', 'end', values=list(registro.values()))
+    for entrada in campos.values():
+        entrada.delete(0, 'end')
+
+# Função genérica para excluir registros
+def excluir_registro(tree, dados_arquivo):
+    selecionado = tree.selection()
+    if selecionado:
+        item = tree.item(selecionado)
+        valores = item['values']
+        dados = carregar_dados(dados_arquivo)
+        for dado in dados:
+            if list(dado.values()) == list(valores):
+                dados.remove(dado)
+                break
+        salvar_dados(dados_arquivo, dados)
+        tree.delete(selecionado)
+
+# Função para atualizar registros
+def atualizar_registro(tree, campos, dados_arquivo):
+    selecionado = tree.selection()
+    if selecionado:
+        item = tree.item(selecionado)
+        valores = item['values']
+        registro_atualizado = {campo: campos[campo].get() for campo in campos}
+        dados = carregar_dados(dados_arquivo)
+        for dado in dados:
+            if list(dado.values()) == list(valores):
+                dados.remove(dado)
+                dados.append(registro_atualizado)
+                break
+        salvar_dados(dados_arquivo, dados)
+        tree.item(selecionado, values=list(registro_atualizado.values()))
+        for entrada in campos.values():
+            entrada.delete(0, 'end')
+
+# Função para adicionar registro no controle de estoque com alertas de estoque e validade
+def adicionar_registro_estoque(tree, campos, dados_arquivo):
+    registro = {campo: entrada.get() for campo, entrada in campos.items()}
+    dados = carregar_dados(dados_arquivo)
+
+    # Verifica se o estoque é menor que o estoque mínimo
+    if int(campos["Quantidade"].get()) < int(campos["Estoque Mínimo"].get()):
+        messagebox.showwarning("Aviso de Estoque Baixo", f"Estoque de {campos['Produto'].get()} está abaixo do mínimo!")
+
+    # Verifica se a validade está próxima
+    try:
+        data_validade = datetime.strptime(campos["Data Validade"].get(), '%d/%m/%Y')
+        if data_validade <= datetime.now() + timedelta(days=7):
+            messagebox.showwarning("Aviso de Validade Próxima", f"O produto {campos['Produto'].get()} está próximo da validade!")
+    except ValueError:
+        messagebox.showerror("Erro", "Data de validade inválida. Use o formato dd/mm/aaaa.")
+
+    dados.append(registro)
+    salvar_dados(dados_arquivo, dados)
+    tree.insert('', 'end', values=list(registro.values()))
+    for entrada in campos.values():
+        entrada.delete(0, 'end')
+
+# Função para adicionar registro no controle de compras com combobox de status
+def adicionar_registro_compras(tree, campos, status_var, dados_arquivo):
+    registro = {campo: entrada.get() for campo, entrada in campos.items()}
+    registro["Status"] = status_var.get()  # Adiciona o status selecionado
+    dados = carregar_dados(dados_arquivo)
+    dados.append(registro)
+    salvar_dados(dados_arquivo, dados)
+    tree.insert('', 'end', values=list(registro.values()))
+    for entrada in campos.values():
+        entrada.delete(0, 'end')
+
+# Função para adicionar registro na gestão de perdas com checkbuttons
+def adicionar_registro_perdas(tree, campos, defeito_var, quebrado_var, vencido_var, dados_arquivo):
+    registro = {campo: entrada.get() for campo, entrada in campos.items()}
+    registro["Defeito"] = "Sim" if defeito_var.get() else "Não"
+    registro["Quebrado"] = "Sim" if quebrado_var.get() else "Não"
+    registro["Vencido"] = "Sim" if vencido_var.get() else "Não"
+    dados = carregar_dados(dados_arquivo)
+    dados.append(registro)
+    salvar_dados(dados_arquivo, dados)
+    tree.insert('', 'end', values=list(registro.values()))
+    for entrada in campos.values():
+        entrada.delete(0, 'end')
+
+# Função para criar a interface principal
+def criar_interface():
+    root = tk.Tk()
+    root.title("Sistema de Gerenciamento de Supermercados")
+    notebook = ttk.Notebook(root)
+    notebook.pack(expand=True, fill='both')
+
+    # Definindo as cores
+    cor_fundo = "#f0f0f0"
+    cor_botao = "#4CAF50"
+    cor_texto = "#000000"
+    cor_titulo = "#333333"
+    cor_entrada = "#FFFFFF"
+    cor_treeview_fundo = "#e6e6e6"
+
+    # Configurações das abas
+    abas = {
+        "FUNCIONÁRIOS": {"campos": ["Nome", "ID", "Setor", "Endereço", "Data Admissão", "Data Saída", "Contato", "Email"],
+                         "arquivo": "funcionarios.json"},
+        "FORNECEDORES": {"campos": ["Empresa", "CNPJ", "Categoria", "Contato"],
+                         "arquivo": "fornecedor.json"},
+        "CADASTRO PRODUTOS": {"campos": ["Produto", "Código", "Categoria", "Quantidade", "Preço Compra", "Preço Venda", "Data Entrada", "Data de Validade"],
+                              "arquivo": "produtos.json"},
+        "CONTROLE ESTOQUE": {"campos": ["Produto", "Código", "Quantidade", "Data Validade", "Preço Compra", "Estoque Mínimo"],
+                             "arquivo": "estoque.json"},
+        "PRODUTOS VENDIDOS": {"campos": ["Produto", "Código", "Categoria", "Quantidade", "Valor Unitário", "Valor Total", "Data Saída", "Data Validade"],
+                              "arquivo": "vendidos.json"},
+        "GESTÃO PERDAS": {"campos": ["Produto","Código", "Data Validade", "Observação"],
+                          "arquivo": "perdas.json"},
+        "PREFERÊNCIAS DE CLIENTES": {"campos": ["Operador(a)/Caixa", "ID", "Produto em Falta"],
+                                     "arquivo": "preferencias.json"},
+        "VENDAS SAZONAIS": {"campos": ["Evento", "Produtos Selecionados", "Código dos Produtos", "Data Início", "Data Término", "Observação"],
+                            "arquivo": "vendas_sazonais.json"},
+        "CONTROLE COMPRAS": {"campos": ["Produto", "Código", "Quantidade", "Valor", "Status"],
+                             "arquivo": "compras.json"},
+        "FORMAS DE PAGAMENTO": {"campos": ["Forma de Pagamento"],
+                                "arquivo": "pagamentos.json"},
+        "PROMOÇÕES DA SEMANA": {"campos": ["Produto", "Código", "Data Início", "Data Término", "Observação"],
+                                "arquivo": "promocoes.json"},
+    }
+
+    # Criação de cada aba
+    for nome_aba, config in abas.items():
+        aba = ttk.Frame(notebook)
+        notebook.add(aba, text=nome_aba)
+        campos = {campo: tk.Entry(aba) for campo in config["campos"]}
+
+        for i, campo in enumerate(campos):
+            tk.Label(aba, text=campo).grid(row=i, column=0)
+            if "Data" in campo:
+                campos[campo] = DateEntry(aba)
+                campos[campo].grid(row=i, column=1)
+            else:
+                campos[campo].grid(row=i, column=1)
+
+        tree = ttk.Treeview(aba, columns=config["campos"], show='headings')
+        tree.grid(row=len(campos), column=0, columnspan=3)
+
+        for campo in config["campos"]:
+            tree.heading(campo, text=campo)
+
+        if nome_aba == "CONTROLE ESTOQUE":
+            tk.Button(aba, text="Adicionar", command=lambda tree=tree, campos=campos: adicionar_registro_estoque(tree, campos, config["arquivo"]), bg=cor_botao, fg=cor_texto).grid(row=len(campos)+1, column=0)
+
+        elif nome_aba == "GESTÃO PERDAS":
+            defeito_var = tk.BooleanVar()
+            quebrado_var = tk.BooleanVar()
+            vencido_var = tk.BooleanVar()
+            tk.Checkbutton(aba, text="Defeito", variable=defeito_var).grid(row=len(campos), column=0)
+            tk.Checkbutton(aba, text="Quebrado", variable=quebrado_var).grid(row=len(campos), column=1)
+            tk.Checkbutton(aba, text="Vencido", variable=vencido_var).grid(row=len(campos), column=2)
+            tk.Button(aba, text="Adicionar", command=lambda tree=tree, campos=campos, defeito_var=defeito_var, quebrado_var=quebrado_var, vencido_var=vencido_var: adicionar_registro_perdas(tree, campos, defeito_var, quebrado_var, vencido_var, config["arquivo"]), bg=cor_botao, fg=cor_texto).grid(row=len(campos)+1, column=0)
+
+        elif nome_aba == "CONTROLE COMPRAS":
+            status_var = tk.StringVar()
+            status_combobox = ttk.Combobox(aba, textvariable=status_var)
+            status_combobox['values'] = ["Pendente", "Em Andamento", "Finalizada"]
+            status_combobox.grid(row=len(campos), column=1)
+            tk.Button(aba, text="Adicionar", command=lambda tree=tree, campos=campos, status_var=status_var: adicionar_registro_compras(tree, campos, status_var, config["arquivo"]), bg=cor_botao, fg=cor_texto).grid(row=len(campos)+1, column=0)
+
+        else:
+            tk.Button(aba, text="Adicionar", command=lambda tree=tree, campos=campos: adicionar_registro(aba, tree, campos, config["arquivo"]), bg=cor_botao, fg=cor_texto).grid(row=len(campos)+1, column=0)
+
+        tk.Button(aba, text="Excluir", command=lambda tree=tree: excluir_registro(tree, config["arquivo"]), bg="#FF5733", fg=cor_texto).grid(row=len(campos)+1, column=1)
+
+        tk.Button(aba, text="Atualizar", command=lambda tree=tree, campos=campos: atualizar_registro(tree, campos, config["arquivo"]), bg="#FFC107", fg=cor_texto).grid(row=len(campos)+1, column=2)
+
+    root.mainloop()
+
+# Executa a interface
+if __name__ == "__main__":
+    criar_interface()
